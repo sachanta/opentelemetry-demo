@@ -4,27 +4,76 @@
 # extra settings to be merged into OpenTelemetry Collector configuration
 # do not delete this file
 
-## Example configuration for sending data to your own OTLP HTTP backend
-## Note: the spanmetrics exporter must be included in the exporters array
-## if overriding the traces pipeline.
+## NOTE: list values here REPLACE the base config's lists rather than appending,
+## so every pipeline below repeats the base exporters/processors it still needs.
+## The spanmetrics connector must stay in the traces exporters array.
 ##
+## Required env vars (set in docker-compose.override.yml):
+##   Dynatrace: DT_ENV_ID, DT_ENV_SUFFIX, DT_TOKEN
+##   Splunk:    SPLUNK_REALM, SPLUNK_ACCESS_TOKEN  (traces + metrics only)
 exporters:
   otlphttp/dt:
     endpoint: "https://${DT_ENV_ID}.${DT_ENV_SUFFIX}/api/v2/otlp"
     headers:
       Authorization: "Api-Token ${DT_TOKEN}"
+
+  # Splunk Observability Cloud: traces + metrics.
+  # Splunk uses a different path per signal, so traces_endpoint/metrics_endpoint
+  # are set individually and `endpoint` is deliberately omitted. Do NOT add this
+  # exporter to the logs pipeline - with no logs_endpoint set the collector will
+  # fail to start. Logs go through splunk_hec/splunk below.
+  # Metrics must go over OTLP/HTTP; Splunk does not accept OTLP metrics over gRPC.
+  otlphttp/splunk:
+    traces_endpoint: "https://ingest.${SPLUNK_REALM}.observability.splunkcloud.com/v2/trace/otlp"
+    metrics_endpoint: "https://ingest.${SPLUNK_REALM}.observability.splunkcloud.com/v2/datapoint/otlp"
+    headers:
+      X-SF-Token: "${SPLUNK_ACCESS_TOKEN}"
+
+  # Splunk Observability Cloud does NOT ingest or store application logs.
+  # Only metrics, traces and AlwaysOn Profiling data go to the O11y ingest
+  # domain. Logs must land in a Splunk Cloud Platform / Enterprise index, which
+  # Log Observer Connect then queries in place to display inside O11y Cloud.
+  #
+  # The old native "Log Observer" accepted logs at
+  # https://ingest.<realm>.observability.splunkcloud.com/v1/log, but it was
+  # retired (migration to Log Observer Connect was required by Jan 2024). Do not
+  # send application logs there - on a current tenant nothing displays them.
+  #
+  # To enable logs: uncomment below, set SPLUNK_HEC_URL / SPLUNK_HEC_TOKEN /
+  # SPLUNK_HEC_INDEX in docker-compose.override.yml, add splunk_hec/splunk back
+  # to the logs pipeline, then point Log Observer Connect at that index.
+  # splunk_hec/splunk:
+  #   endpoint: "${SPLUNK_HEC_URL}"          # e.g. https://http-inputs-<stack>.splunkcloud.com/services/collector
+  #   token: "${SPLUNK_HEC_TOKEN}"           # a Splunk platform HEC token, NOT the O11y access token
+  #   index: "${SPLUNK_HEC_INDEX}"           # required; the index Log Observer Connect will query
+  #   source: "otel"
+  #   sourcetype: "otel"
+
   debug:
     verbosity: detailed
 
 processors:
+  # Dynatrace and Splunk both want delta temporality for sums/histograms.
   cumulativetodelta:
+
+  # Splunk APM files traces under deployment.environment; without it everything
+  # lands in an "unknown" environment. Harmless for the other backends.
+  resource/environment:
+    attributes:
+      - key: deployment.environment
+        value: ${env:DEPLOYMENT_ENVIRONMENT:-opentelemetry-demo}
+        action: upsert
 
 service:
   pipelines:
     traces:
-      exporters: [spanmetrics, otlp, otlphttp/dt, debug]
+      processors: [memory_limiter, transform, resource/environment, batch]
+      exporters: [spanmetrics, otlp, otlphttp/dt, otlphttp/splunk, debug]
     metrics:
-      processors: [cumulativetodelta, batch]
-      exporters: [otlphttp/dt, otlphttp/prometheus, debug]
+      processors: [memory_limiter, cumulativetodelta, resource/environment, batch]
+      exporters: [otlphttp/dt, otlphttp/prometheus, otlphttp/splunk, debug]
     logs:
+      processors: [memory_limiter, resource/environment, batch]
+      # No Splunk exporter here: O11y Cloud has no log ingest. Add
+      # splunk_hec/splunk once a Splunk platform HEC endpoint is available.
       exporters: [otlphttp/dt, opensearch, debug]
