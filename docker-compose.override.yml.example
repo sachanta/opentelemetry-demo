@@ -1,0 +1,35 @@
+# Template for docker-compose.override.yml, which is gitignored and therefore
+# never arrives with a clone. Copy this file, then fill in the four values
+# marked REPLACE_ below:
+#
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# See claude_summary/CREDENTIALS.md for how to obtain each one.
+# Never commit docker-compose.override.yml - it holds plaintext tokens.
+
+services:
+  otel-collector:
+    environment:
+      # --- Dynatrace (traces, metrics, logs) ---
+      # Tenant ID, the 8-char string in your Dynatrace URL.
+      - DT_ENV_ID=REPLACE_WITH_TENANT_ID
+      # Classic API token (dt0c01.…) with openTelemetryTrace.ingest,
+      # metrics.ingest and logs.ingest scopes.
+      - DT_TOKEN=REPLACE_WITH_DT_API_TOKEN
+      - DT_ENV_SUFFIX=live.dynatrace.com
+
+      # --- Splunk Observability Cloud (traces, metrics; no logs) ---
+      # Realm is the short region code in your O11y Cloud URL, e.g. us0, us1, eu0.
+      - SPLUNK_REALM=REPLACE_WITH_REALM
+      # Org access token with INGEST authorization.
+      - SPLUNK_ACCESS_TOKEN=REPLACE_WITH_SPLUNK_ACCESS_TOKEN
+
+      # --- Shared ---
+      # Sets deployment.environment on all telemetry; Splunk APM groups by it.
+      - DEPLOYMENT_ENVIRONMENT=opentelemetry-demo
+      # Four exporters across three pipelines no longer fit the stock 200M cap.
+      - GOMEMLIMIT=320MiB
+    deploy:
+      resources:
+        limits:
+          memory: 400M
