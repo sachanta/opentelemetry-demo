@@ -8,14 +8,15 @@ Last updated 2026-10-07.
 
 ```
 upstream   open-telemetry/opentelemetry-demo     (the real project)
-  └─ fork  avillela/opentelemetry-demo           = remote "origin"  ← READ-ONLY, not ours
-       └─  sachanta/opentelemetry-demo           = remote "srikar"  ← ours, push here
+  └─ fork  avillela/opentelemetry-demo           read-only to us
+       └─  sachanta/opentelemetry-demo           ← ours, all pushes go here
 ```
 
-- **`origin` is not the user's repo.** It is Adriana Villela's public fork, and the user has pull access only (`push: false`). A push to `origin` will be rejected. Push to **`srikar`**.
-- If `srikar` is not configured after a fresh clone, add it:
-  `git remote add srikar https://github.com/sachanta/opentelemetry-demo.git`
-- Working branch: **`splunk-o11y-export`** (tracks `srikar/splunk-o11y-export`).
+- **Check `git remote -v` before pushing.** Which repo `origin` means depends on how the checkout was made:
+  - Cloned from `sachanta/opentelemetry-demo` -> `origin` **is** the user's fork. Plain `git push` is correct.
+  - Srikar's original working copy (`~/wd/repos/opentelemetry-demo`) -> `origin` is **Adriana Villela's** fork, pull-access only (`push: false`). A push there is rejected. Use the `srikar` remote instead; add it if absent:
+    `git remote add srikar https://github.com/sachanta/opentelemetry-demo.git`
+- Working branch: **`splunk-o11y-export`**. It is **not** the default branch, so a plain clone lands on `main`, which has none of this work. `git checkout splunk-o11y-export`, or clone with `-b splunk-o11y-export`.
 - That branch sits on `avillela-dt-backend`, which is **~458 commits behind upstream**. Fine for config work; rebase before any upstream PR.
 - Both forks are **public**. Treat everything committed as world-readable.
 
@@ -81,6 +82,6 @@ Full command in `claude_summary/CREDENTIALS.md`. It runs the collector image's `
 
 - **Separate concerns into separate docs.** Do not fold a new backend's documentation into an existing backend's file.
 - **Do not commit unrelated changes.** The working tree chronically carries pre-existing noise — `.env` blank-line edits, `src/react-native-app/package-lock.json` deletions, a stray `env.txt` (an Aug 2025 copy of `.env`), and `.claude/settings.local.json`. Stage explicitly; never `git add -A`.
-- **Confirm before pushing**, and confirm the remote — see the topology warning above.
+- **Confirm before pushing**, and check `git remote -v` first — see the topology section above.
 - `.claude/` is untracked but not gitignored. It should be excluded.
 - Harmless shell noise: `setValueForKeyFakeAssocArray: command not found: _encode` on every Bash call comes from the user's zsh profile. Ignore it; it is not a failure.

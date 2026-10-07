@@ -28,9 +28,10 @@ Tokens 2, 4 and 5 are three different credentials from two different vendors wit
 ## Quick start on a new machine
 
 ```bash
-git clone https://github.com/sachanta/opentelemetry-demo.git
+# splunk-o11y-export is NOT the default branch; a plain clone lands on main,
+# which has none of this work.
+git clone -b splunk-o11y-export https://github.com/sachanta/opentelemetry-demo.git
 cd opentelemetry-demo
-git checkout splunk-o11y-export
 
 cp docker-compose.override.yml.example docker-compose.override.yml
 # edit the four REPLACE_ values, then:
