@@ -116,13 +116,39 @@ This one is **not** read by the demo. It is read by the Claude desktop app proce
 
 **Where:** Dynatrace -> Account Management -> Identity & access management -> **Platform tokens**.
 
-**Scopes:**
+**Scopes.** There is no `storage:*:read` wildcard to select - each is listed individually. Minimum to connect at all:
 
 - `mcp-gateway:servers:invoke`
 - `mcp-gateway:servers:read`
-- `storage:*:read` (whichever `storage:…:read` scopes you need for DQL)
+
+For DQL, problems, logs and Davis to actually work, add:
+
+```
+ai:operator:execute
+davis-copilot:conversations:execute
+davis-copilot:nl2dql:execute
+davis-copilot:dql2nl:execute
+davis-copilot:document-search:execute
+davis:analyzers:read
+davis:analyzers:execute
+storage:logs:read          storage:spans:read        storage:metrics:read
+storage:events:read        storage:entities:read     storage:smartscape:read
+storage:bizevents:read     storage:buckets:read      storage:system:read
+storage:user.events:read   storage:user.sessions:read
+storage:user.replays:read  storage:security.events:read
+storage:files:read         document:documents:read
+```
 
 It starts `dt0s16.` and is sent as `Authorization: Bearer`.
+
+**The plugin's actual MCP config** (`.mcp.json`, dynatrace-for-ai 8.0.1) is a remote HTTP server:
+
+```
+url:     ${DT_ENVIRONMENT}/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp
+headers: Authorization: Bearer ${DT_PLATFORM_TOKEN}
+```
+
+Because the URL is concatenated, **`DT_ENVIRONMENT` must be the bare origin** - `https://<tenant>.apps.dynatrace.com`, with no trailing slash and no UI path. Pasting a deep link such as `.../ui/apps/dynatrace.quickstart/` produces a 404.
 
 **How to set it** (macOS):
 
