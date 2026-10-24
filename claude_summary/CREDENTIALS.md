@@ -11,7 +11,8 @@ Everything the demo needs in order to export telemetry, and where each value goe
 | # | Variable | Used by | Type |
 |---|---|---|---|
 | 1 | `DT_ENV_ID` | collector | Dynatrace tenant ID (not secret) |
-| 2 | `DT_TOKEN` | collector | Dynatrace **classic API token** (`dt0c01.…`) |
+| 2 | `DT_TOKEN` | collector | Dynatrace ingest token — type depends on tenant generation |
+| 2b | `DT_AUTH_SCHEME` | collector | `Bearer` (Latest) or `Api-Token` (Classic) |
 | 3 | `SPLUNK_REALM` | collector | Splunk region code (not secret) |
 | 4 | `SPLUNK_ACCESS_TOKEN` | collector | Splunk **org access token** |
 
@@ -44,22 +45,30 @@ If you only want one backend, see [Running with one backend](#running-with-one-b
 
 ## 1-2. Dynatrace ingest token (collector)
 
-**Where:** Dynatrace UI -> **Access tokens** -> *Generate new token*.
+**First determine your tenant generation**, because it changes both the token type and the `Authorization` header. The endpoint is the same either way.
 
-**Scopes** (exactly these three, nothing more):
+| | Dynatrace **Latest** | Dynatrace **Classic** |
+|---|---|---|
+| Token type | Platform token | Classic access token |
+| Prefix | `dt0s16.` | `dt0c01.` |
+| Header | `Bearer` | `Api-Token` |
+| `DT_AUTH_SCHEME` | `Bearer` | `Api-Token` |
+| Scopes | `openpipeline:traces:ingest`, `openpipeline:metrics:ingest`, `openpipeline:logs:ingest` | `openTelemetryTrace.ingest`, `metrics.ingest`, `logs.ingest` |
+| Created under | Account Management -> Identity & access management -> **Platform tokens** | Dynatrace UI -> **Access tokens** |
 
-- `openTelemetryTrace.ingest`
-- `metrics.ingest`
-- `logs.ingest`
+**How to tell:** try to create a platform token and look for the `openpipeline:*:ingest` scopes. If they are offered, you are on Latest — use them with `DT_AUTH_SCHEME=Bearer`. If you only find the classic *Access tokens* page with `openTelemetryTrace.ingest`, you are on Classic — use `DT_AUTH_SCHEME=Api-Token`. New tenants created from 2026 onward are normally Latest.
 
-The token is shown **once**. It starts `dt0c01.`.
+Either token is shown **once**.
+
+Keep this token separate from the MCP plugin's platform token (section 5). On Latest both are `dt0s16.` platform tokens, but they carry different scopes and must not be shared.
 
 **Tenant ID** is the first path segment of your Dynatrace URL: `https://<DT_ENV_ID>.live.dynatrace.com`. Eight characters, e.g. `fwn71039`.
 
 ```yaml
-- DT_ENV_ID=fwn71039
-- DT_TOKEN=dt0c01.XXXXXXXX.XXXXXXXX…
+- DT_ENV_ID=abc12345
 - DT_ENV_SUFFIX=live.dynatrace.com
+- DT_AUTH_SCHEME=Bearer          # or Api-Token on a Classic tenant
+- DT_TOKEN=dt0s16.XXXXXXXX.XXXXXXXX…
 ```
 
 `DT_ENV_SUFFIX` is `live.dynatrace.com` for SaaS. Use the **live** host here, not `apps`. The resulting endpoint is `https://<DT_ENV_ID>.<DT_ENV_SUFFIX>/api/v2/otlp`.
@@ -161,7 +170,7 @@ docker compose up -d --force-recreate otel-collector
 | Symptom | Likely cause |
 |---|---|
 | Collector exits immediately, `expected ... got ...` on a `${VAR}` | A variable is unset; the override file is missing or misnamed |
-| `401` against Dynatrace | `DT_TOKEN` wrong, or missing an `*.ingest` scope |
+| `401` against Dynatrace | `DT_TOKEN` wrong, missing an ingest scope, or `DT_AUTH_SCHEME` mismatched to the token type |
 | `403` against Dynatrace | Token valid but lacks the scope for that signal |
 | `404` against Dynatrace | `DT_ENV_ID` or `DT_ENV_SUFFIX` wrong (check `live` vs `apps`) |
 | `401` against Splunk | `SPLUNK_ACCESS_TOKEN` wrong, or it lacks `INGEST` authorization |

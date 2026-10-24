@@ -9,13 +9,19 @@
 ## The spanmetrics connector must stay in the traces exporters array.
 ##
 ## Required env vars (set in docker-compose.override.yml):
-##   Dynatrace: DT_ENV_ID, DT_ENV_SUFFIX, DT_TOKEN
+##   Dynatrace: DT_ENV_ID, DT_ENV_SUFFIX, DT_TOKEN, DT_AUTH_SCHEME
 ##   Splunk:    SPLUNK_REALM, SPLUNK_ACCESS_TOKEN  (traces + metrics only)
 exporters:
+  # Auth scheme depends on the tenant generation:
+  #   Dynatrace Latest  -> platform token (dt0s16.), DT_AUTH_SCHEME=Bearer
+  #                        scopes: openpipeline:{traces,metrics,logs}:ingest
+  #   Dynatrace Classic -> access token  (dt0c01.), DT_AUTH_SCHEME=Api-Token
+  #                        scopes: openTelemetryTrace.ingest, metrics.ingest, logs.ingest
+  # Defaults to Api-Token so an unset var keeps the old Classic behaviour.
   otlphttp/dt:
     endpoint: "https://${DT_ENV_ID}.${DT_ENV_SUFFIX}/api/v2/otlp"
     headers:
-      Authorization: "Api-Token ${DT_TOKEN}"
+      Authorization: "${env:DT_AUTH_SCHEME:-Api-Token} ${DT_TOKEN}"
 
   # Splunk Observability Cloud: traces + metrics.
   # Splunk uses a different path per signal, so traces_endpoint/metrics_endpoint
