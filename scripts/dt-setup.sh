@@ -7,6 +7,8 @@
 #
 # Usage:
 #   export DT_BOOTSTRAP_TOKEN=dt0c01.…       # needs apiTokens.write scope
+#   # or, to keep it out of shell history:
+#   export DT_BOOTSTRAP_TOKEN_FILE=claude_summary/DT_Creds.txt
 #   scripts/dt-setup.sh dgj76891             # tenant ID
 #   scripts/dt-setup.sh dgj76891 --recreate  # also restart the collector + verify
 #   scripts/dt-setup.sh dgj76891 --dry-run   # show what would happen, change nothing
@@ -40,7 +42,20 @@ SCOPES='["openTelemetryTrace.ingest","metrics.ingest","logs.ingest"]'
 die() { echo "error: $*" >&2; exit 1; }
 
 [ -n "$ENV_ID" ] || die "no tenant ID given. usage: scripts/dt-setup.sh <DT_ENV_ID> [--recreate] [--dry-run]"
-[ -n "${DT_BOOTSTRAP_TOKEN:-}" ] || die "DT_BOOTSTRAP_TOKEN is not set. Create a token with the apiTokens.write scope, then: export DT_BOOTSTRAP_TOKEN=dt0c01.…"
+# Token may come from the environment, or from a file so it never touches argv
+# or shell history. The file should hold the token alone, or a KEY=VALUE /
+# KEY: VALUE line whose value starts dt0. Keep that file gitignored.
+if [ -z "${DT_BOOTSTRAP_TOKEN:-}" ] && [ -n "${DT_BOOTSTRAP_TOKEN_FILE:-}" ]; then
+  [ -f "$DT_BOOTSTRAP_TOKEN_FILE" ] || die "DT_BOOTSTRAP_TOKEN_FILE=$DT_BOOTSTRAP_TOKEN_FILE does not exist"
+  DT_BOOTSTRAP_TOKEN=$(python3 -c "
+import re,sys
+t=open(sys.argv[1],errors='replace').read()
+m=re.search(r'dt0[a-z]\\d{2}\\.[A-Za-z0-9._-]+', t)
+sys.stdout.write(m.group(0) if m else '')
+" "$DT_BOOTSTRAP_TOKEN_FILE")
+  [ -n "$DT_BOOTSTRAP_TOKEN" ] || die "no dt0… token found in $DT_BOOTSTRAP_TOKEN_FILE. That file needs an API token, not a username/password - the Dynatrace API has no password auth."
+fi
+[ -n "${DT_BOOTSTRAP_TOKEN:-}" ] || die "no bootstrap token. Either: export DT_BOOTSTRAP_TOKEN=dt0c01.… , or export DT_BOOTSTRAP_TOKEN_FILE=/path/to/file containing one. The token needs the apiTokens.write scope."
 [ -f "$OVERRIDE" ] || die "$OVERRIDE not found. Start from the template: cp docker-compose.override.yml.example docker-compose.override.yml"
 command -v python3 >/dev/null || die "python3 is required"
 
