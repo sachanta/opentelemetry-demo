@@ -52,3 +52,9 @@ test/tracetesting/tracetesting-vars.yaml
 *.apk
 
 !src/currency/build
+
+# Local credential scratch files - never commit
+claude_summary/DT_Creds.txt
+*_Creds.txt
+*.creds
+secrets.env

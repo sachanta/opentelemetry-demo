@@ -43,6 +43,23 @@ If you only want one backend, see [Running with one backend](#running-with-one-b
 
 ---
 
+## Automating the collector token
+
+Trial tenants expire often, so `scripts/dt-setup.sh` creates the ingest token and rewrites `docker-compose.override.yml` for you:
+
+```bash
+export DT_BOOTSTRAP_TOKEN=dt0c01.…        # one-off, needs apiTokens.write
+scripts/dt-setup.sh <tenant-id> --recreate
+```
+
+It POSTs to `/api/v2/apiTokens` with exactly the three ingest scopes, sets `DT_ENV_ID` / `DT_TOKEN` / `DT_AUTH_SCHEME` / `DT_ENV_SUFFIX` in place (leaving the Splunk vars and memory settings alone), backs up the previous file to `.bak`, and optionally recreates the collector and greps its logs for auth errors. `--dry-run` shows the plan without calling the API.
+
+The bootstrap token is read from the environment, never from a file in the repo, and created token values are never printed.
+
+**The bootstrap token itself must be made by hand** — that is the chicken-and-egg step. In the new tenant create one access token with the single scope `apiTokens.write`.
+
+**This does not cover the MCP plugin token.** Platform tokens use a different API (`POST https://api.dynatrace.com/iam/v1/accounts/{accountUuid}/platform-tokens`) which needs an OAuth client with `platform-token:tokens:manage` plus the account and user UUIDs. For a single developer tenant it is less work to create that one in the UI — see section 5.
+
 ## 1-2. Dynatrace ingest token (collector)
 
 **First determine your tenant generation**, because it changes both the token type and the `Authorization` header. The endpoint is the same either way.
